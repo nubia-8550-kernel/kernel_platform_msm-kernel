@@ -150,20 +150,23 @@ function merge_vendor_diffconfig() {
     echo "merge vendor diffconfig"
     set -x
 
-    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/${PRODUCT_DEVICE}_diff_config
+    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/kalama_diff_config2
     if [ -e $file_name ] ; then
-      ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+      ./${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r -y ${OUT_DIR}/.config $file_name
+      cp .config ${OUT_DIR}/.config
     fi
 
-    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/boards/${ZTE_BOARD_NAME}_diff_config
+    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/boards/trega_diff_config2
     if [ -e $file_name ] ; then
-      ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+      ./${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r -y ${OUT_DIR}/.config $file_name
+      cp .config ${OUT_DIR}/.config
     fi
 
     if [ "$ZTE_FEATURE_ZTE_LOG_EXCEPTION" == "true" ]; then
-        file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/zlog_diff_config
+        file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/zlog_diff_config2
         if [ -e $file_name ] ; then
-          ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+          ./${KERNEL_DIR}/scripts/kconfig/merge_config.sh -m -r -y ${OUT_DIR}/.config $file_name
+          cp .config ${OUT_DIR}/.config
         fi
     fi
 
