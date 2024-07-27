@@ -921,4 +921,20 @@ config INPUT_STPMIC1_ONKEY
 	  To compile this driver as a module, choose M here: the
 	  module will be called stpmic1_onkey.
 
+config NUBIA_S2_WARM
+    bool "nubia s2 warm reset process"
+    default n
+    help
+      set nubia s2 warm reset resource to s2-kpdpwr-resin
+
+config STMVL53L1
+    tristate "STM VL53L1 Proximity support"
+    depends on I2C=y
+    default y
+    help
+      Say Y here if you want to use STMicroelectronics's vl53L1 TOF AF sensor
+      through I2C interface.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called stmvl53l1.
 endif
