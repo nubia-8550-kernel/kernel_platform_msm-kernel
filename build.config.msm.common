@@ -144,6 +144,36 @@ function check_merged_defconfig() {
 }
 append_cmd POST_DEFCONFIG_CMDS "check_merged_defconfig"
 
+function merge_vendor_diffconfig() {
+  if [ -z "${SKIP_DEFCONFIG}" ] ; then
+    echo "======================================================="
+    echo "merge vendor diffconfig"
+    set -x
+
+    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/${PRODUCT_DEVICE}_diff_config
+    if [ -e $file_name ] ; then
+      ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+    fi
+
+    file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/boards/${ZTE_BOARD_NAME}_diff_config
+    if [ -e $file_name ] ; then
+      ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+    fi
+
+    if [ "$ZTE_FEATURE_ZTE_LOG_EXCEPTION" == "true" ]; then
+        file_name=${KERNEL_DIR}/../../vendor/zte/kernelconfig/qcom/configs/zlog_diff_config
+        if [ -e $file_name ] ; then
+          ./${KERNEL_DIR}/../../vendor/zte/kernelconfig/common/scripts/zte_kernel_config.sh ${OUT_DIR}/.config $file_name
+        fi
+    fi
+
+    (cd ${KERNEL_DIR} && make "${TOOL_ARGS[@]}" O=${OUT_DIR} "${MAKE_ARGS[@]}" olddefconfig)
+
+    set +x
+  fi
+}
+append_cmd POST_DEFCONFIG_CMDS "merge_vendor_diffconfig"
+
 # Wrapper function around merge_defconfig_fragment to reduce repeated logic
 # Usage: apply_defconfig_fragment ${KERNEL_DIR}/cuttlefish.fragment cuttlefish-gki_defconfig
 function apply_defconfig_fragment() {
