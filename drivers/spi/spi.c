@@ -41,7 +41,33 @@ EXPORT_TRACEPOINT_SYMBOL(spi_transfer_stop);
 
 #include "internals.h"
 
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+#include <vendor/comdef/zlog_common_base.h>
+#endif
+
 static DEFINE_IDR(spi_master_idr);
+
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+static struct delayed_work		zlog_spi_work;
+static struct zlog_client *zlog_spi_client = NULL;
+
+static struct zlog_mod_info zlog_spi_dev = {
+	.module_no = ZLOG_MODULE_SPI,
+	.name = "SPI",
+	.device_name = "spi_dev",
+	.ic_name = "spi_controller",
+	.module_name = "spi",
+	.fops = NULL,
+};
+
+static void zte_zlog_spi_work(struct work_struct *work) {
+	zlog_spi_client = zlog_register_client(&zlog_spi_dev);
+	if (!zlog_spi_client)
+		pr_err("%s zlog register client zlog_spi_dev fail\n", __func__);
+	else
+		pr_info("%s zlog register client zlog_spi_dev success\n", __func__);
+}
+#endif
 
 static void spidev_release(struct device *dev)
 {
@@ -1562,6 +1588,12 @@ static void __spi_pump_messages(struct spi_controller *ctlr, bool in_kthread)
 			dev_err(&ctlr->dev, "Failed to power device: %d\n",
 				ret);
 			mutex_unlock(&ctlr->io_mutex);
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+			if((ret) && (zlog_spi_client != NULL)) {
+				zlog_client_record(zlog_spi_client, "%s: Failed to power device: %d\n", __func__, ret);
+				zlog_client_notify(zlog_spi_client, ZLOG_SPI_DEVICE_PM_RUNTIME_ERR);
+			}
+#endif
 			return;
 		}
 	}
@@ -1583,6 +1615,12 @@ static void __spi_pump_messages(struct spi_controller *ctlr, bool in_kthread)
 			spi_finalize_current_message(ctlr);
 
 			mutex_unlock(&ctlr->io_mutex);
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+			if((ret) && (zlog_spi_client != NULL)) {
+				zlog_client_record(zlog_spi_client, "%s: failed to prepare transfer hardware: %d\n", __func__, ret);
+				zlog_client_notify(zlog_spi_client, ZLOG_SPI_DEVICE_PRE_TRANSFER_ERR);
+			}
+#endif
 			return;
 		}
 	}
@@ -3999,6 +4037,14 @@ int spi_sync(struct spi_device *spi, struct spi_message *message)
 	ret = __spi_sync(spi, message);
 	mutex_unlock(&spi->controller->bus_lock_mutex);
 
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+	if((ret) && (zlog_spi_client != NULL)) {
+		zlog_client_record(zlog_spi_client, "spi_sync error ret=%d\n", ret);
+		zlog_client_notify(zlog_spi_client, ZLOG_SPI_DEVICE_SYNC_ERR);
+		pr_err("%s: spi_sync error ret=%d'\n", __func__, ret);
+	}
+#endif
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(spi_sync);
@@ -4340,6 +4386,11 @@ static int __init spi_init(void)
 		WARN_ON(of_reconfig_notifier_register(&spi_of_notifier));
 	if (IS_ENABLED(CONFIG_ACPI))
 		WARN_ON(acpi_reconfig_notifier_register(&spi_acpi_notifier));
+
+#ifdef CONFIG_VENDOR_ZTE_DEV_MONITOR_SYSTEM
+	INIT_DELAYED_WORK(&zlog_spi_work, zte_zlog_spi_work);
+	schedule_delayed_work(&zlog_spi_work, msecs_to_jiffies(10000));
+#endif
 
 	return 0;
 

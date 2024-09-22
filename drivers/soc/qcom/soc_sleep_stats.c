@@ -23,7 +23,20 @@
 #include <linux/soc/qcom/smem.h>
 #include <soc/qcom/soc_sleep_stats.h>
 #include <clocksource/arm_arch_timer.h>
+
+#include <linux/syscore_ops.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/irqdomain.h>
+#include <linux/irqchip/arm-gic-v3.h>
+#include <trace/hooks/gic_v3.h>
+#include <linux/ktime.h>
+#include <linux/time.h>
+/*LCD */
+#include <linux/fb.h>
+
 #include <soc/qcom/boot_stats.h>
+
 
 #define STAT_TYPE_ADDR		0x0
 #define COUNT_ADDR		0x4
@@ -45,6 +58,10 @@
 #define DDR_STATS_NAME_ADDR		0x0
 #define DDR_STATS_COUNT_ADDR		0x4
 #define DDR_STATS_DURATION_ADDR		0x8
+
+
+
+#define ZTE_RECORD_NUM		20
 
 #if IS_ENABLED(CONFIG_DEBUG_FS) && IS_ENABLED(CONFIG_QCOM_SMEM)
 struct subsystem_data {
@@ -68,7 +85,28 @@ static struct subsystem_data subsystems[] = {
 	{ "display", 610, 0 },
 	{ "apss", 631, QCOM_SMEM_HOST_ANY },
 };
+
+
+struct subsystem_data_zte {
+struct subsystem_data ss_data;
+	u32 used;
+	u64 accumulated_suspend;
+	u64 accumulated_resume;
+
+	/*part wake time if >x% then record the current time
+	else set value 0
+	*/
+	u64 starttime_partwake;
+};
+
+static struct subsystem_data_zte subsystems_zte[ZTE_RECORD_NUM] = {};
+
+static int sleep_zswresumeparam_mask = 0;
+module_param(sleep_zswresumeparam_mask, int, 0644);
 #endif
+
+/* 0 screen on;  1: screen off */
+static int sleep_zswscnoff_state = 0;
 
 struct stats_entry {
 	uint32_t name;
@@ -106,6 +144,21 @@ struct ddr_stats_g_data *ddr_gdata;
 #endif
 
 static bool ddr_freq_update;
+
+
+static int param_set_sleep_zswscnoff_state(const char *kmessage,
+				   const struct kernel_param *kp)
+{
+	int ret = 0;
+	return ret;
+}
+
+static const struct kernel_param_ops zswscnoff_state_ops = {
+	.set = param_set_sleep_zswscnoff_state,
+	.get = param_get_int,
+};
+module_param_cb(sleep_zswscnoff_state, &zswscnoff_state_ops,
+		&sleep_zswscnoff_state, 0644);
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
 static struct stats_prv_data *gdata;
@@ -146,6 +199,7 @@ uint64_t get_aosd_sleep_exit_time(void)
 EXPORT_SYMBOL(get_aosd_sleep_exit_time);
 #endif
 
+
 static void print_sleep_stats(struct seq_file *s, struct sleep_stats *stat)
 {
 	u64 accumulated = stat->accumulated;
@@ -163,6 +217,19 @@ static void print_sleep_stats(struct seq_file *s, struct sleep_stats *stat)
 	seq_printf(s, "Accumulated Duration = %llu\n", accumulated);
 }
 
+static void print_sleep_stats_zte(const char* name ,struct sleep_stats *stat)
+{
+	u64 accumulated = stat->accumulated;
+	/*
+	 * If a subsystem is in sleep when reading the sleep stats adjust
+	 * the accumulated sleep duration to show actual sleep time.
+	 */
+	if (stat->last_entered_at > stat->last_exited_at)
+		accumulated += arch_timer_read_counter()
+			       - stat->last_entered_at;
+
+	pr_info("%s  Count = %u  Last Entered At = %llu  Last Exited At = %llu  Accumulated Duration = %llu  \n", name, stat->count, stat->last_entered_at, stat->last_exited_at, accumulated);
+}
 static int subsystem_sleep_stats_show(struct seq_file *s, void *d)
 {
 #if IS_ENABLED(CONFIG_DEBUG_FS) && IS_ENABLED(CONFIG_QCOM_SMEM)
@@ -177,6 +244,23 @@ static int subsystem_sleep_stats_show(struct seq_file *s, void *d)
 
 #endif
 	return 0;
+}
+void pm_show_rpmh_master_stats(void)
+{
+	int j = 0;
+
+		for (j = 0; j < ARRAY_SIZE(subsystems_zte); j++) {
+			if (1 == subsystems_zte[j].used) {
+
+				struct subsystem_data *subsystem = &(subsystems_zte[j].ss_data);
+				struct sleep_stats *stat;
+
+				stat = qcom_smem_get(subsystem->pid, subsystem->smem_item, NULL);
+				if (IS_ERR(stat))
+					return ;
+				print_sleep_stats_zte(subsystem->name, stat);
+			}
+		}
 }
 
 DEFINE_SHOW_ATTRIBUTE(subsystem_sleep_stats);
@@ -200,7 +284,49 @@ static int soc_sleep_stats_show(struct seq_file *s, void *d)
 
 	return 0;
 }
+static unsigned long long vmin_count = 0;
+static struct stats_prv_data *g_prv_data = NULL;
+extern void debug_suspend_enabled(void);
 
+extern void debug_suspend_disable(void);
+void pm_show_rpm_stats(void)
+{
+	char stat_type[sizeof(u32) + 1] = {0};
+	u32 offset, type;
+	int i;
+	struct stats_prv_data *prv_data = g_prv_data;
+	void __iomem *reg = prv_data->reg;
+    unsigned long long count = 0;
+
+	for (i = 0; i < prv_data[0].config->num_records; i++) {
+		offset = STAT_TYPE_ADDR + (i * sizeof(struct sleep_stats));
+
+		if (prv_data[0].config->appended_stats_avail)
+			offset += i * sizeof(struct appended_stats);
+
+		prv_data[i].reg = reg + offset;
+
+		type = readl_relaxed(prv_data[i].reg);
+		memcpy(stat_type, &type, sizeof(u32));
+		strim(stat_type);
+
+		if( !strcmp(stat_type, "aosd")) {
+			count = readl_relaxed(prv_data[i].reg + COUNT_ADDR);
+			break;
+		}
+
+	}
+
+	if (vmin_count != count) {
+		pr_info("count: last %llu now %llu , enter vdd min success\n", vmin_count, count);
+		vmin_count = count;
+		debug_suspend_disable();
+	} else {
+		pr_info("count: last %llu now %llu, enter vdd min failed\n", vmin_count, count);
+		pm_show_rpmh_master_stats();
+		debug_suspend_enabled();
+	}
+}
 DEFINE_SHOW_ATTRIBUTE(soc_sleep_stats);
 
 static void  print_ddr_stats(struct seq_file *s, int *count,
@@ -493,6 +619,9 @@ static struct dentry *create_debugfs_entries(void __iomem *reg,
 				debugfs_create_file(subsystems[j].name, 0444,
 						    root, &subsystems[j],
 						    &subsystem_sleep_stats_fops);
+				//subsystems_zte
+				memcpy(&(subsystems_zte[i].ss_data), &subsystems[j], sizeof(struct subsystem_data));
+				subsystems_zte[i].used =1;
 				break;
 			}
 		}
@@ -511,6 +640,10 @@ exit:
 }
 #endif
 
+static void msm_show_resume_irqs(void *data, struct gic_chip_data *gic_data)
+{
+	pm_show_rpm_stats();
+}
 static int soc_sleep_stats_probe(struct platform_device *pdev)
 {
 	struct resource *res;
@@ -529,6 +662,10 @@ static int soc_sleep_stats_probe(struct platform_device *pdev)
 	void __iomem *reg;
 #endif
 	u32 offset;
+
+	register_trace_android_vh_gic_resume(msm_show_resume_irqs, NULL);
+
+	sleep_zswresumeparam_mask = 99;
 
 	config = device_get_match_data(&pdev->dev);
 	if (!config)
@@ -632,6 +769,7 @@ skip_ddr_stats:
 	root = create_debugfs_entries(reg_base, ddr_reg, prv_data,
 				      pdev->dev.of_node);
 	platform_set_drvdata(pdev, root);
+	g_prv_data = prv_data;
 #endif
 
 #ifdef CONFIG_MSM_BOOT_TIME_MARKER
@@ -677,6 +815,7 @@ static const struct of_device_id soc_sleep_stats_table[] = {
 	{ .compatible = "qcom,rpmh-sleep-stats", .data = &rpmh_data },
 	{ }
 };
+
 
 static struct platform_driver soc_sleep_stats_driver = {
 	.probe = soc_sleep_stats_probe,

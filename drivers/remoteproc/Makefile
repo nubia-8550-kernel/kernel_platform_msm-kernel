@@ -46,4 +46,7 @@ obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
 obj-$(CONFIG_STM32_RPROC)		+= stm32_rproc.o
 obj-$(CONFIG_TI_K3_DSP_REMOTEPROC)	+= ti_k3_dsp_remoteproc.o
 obj-$(CONFIG_TI_K3_R5_REMOTEPROC)	+= ti_k3_r5_remoteproc.o
+
+subdir-ccflags-y += -I$(srctree)/drivers/vendor/common/zlog/zlog_common
+
 obj-$(CONFIG_QCOM_RPROC_SLATE)		+= qcom_rproc_slate.o
