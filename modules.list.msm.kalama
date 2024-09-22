@@ -93,9 +93,13 @@ ufshcd-crypto-qti.ko
 arm_smmu.ko
 mem-offline.ko
 sdhci-msm.ko
+zlog_exception_dlkm.ko
+zlog_common_dlkm.ko
 qcom_rimps.ko
 c1dcvs_vendor.ko
 c1dcvs_scmi.ko
 bcl_pmic5.ko
+kmparam.ko
 nvme-core.ko
 nvme.ko
+nubia_hw_version.ko
