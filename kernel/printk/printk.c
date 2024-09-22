@@ -405,7 +405,7 @@ static struct latched_seq clear_seq = {
 
 /* record buffer */
 #define LOG_ALIGN __alignof__(unsigned long)
-#define __LOG_BUF_LEN (1 << CONFIG_LOG_BUF_SHIFT)
+#define __LOG_BUF_LEN (1 << 21)
 #define LOG_BUF_LEN_MAX (u32)(1 << 31)
 static char __log_buf[__LOG_BUF_LEN] __aligned(LOG_ALIGN);
 static char *log_buf = __log_buf;
@@ -679,10 +679,10 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 		return len;
 
 	/* Ratelimit when not explicitly enabled. */
-	if (!(devkmsg_log & DEVKMSG_LOG_MASK_ON)) {
-		if (!___ratelimit(&user->rs, current->comm))
-			return ret;
-	}
+	//if (!(devkmsg_log & DEVKMSG_LOG_MASK_ON)) {
+		//if (!___ratelimit(&user->rs, current->comm))
+			//return ret;
+	//}
 
 	buf = kmalloc(len+1, GFP_KERNEL);
 	if (buf == NULL)
