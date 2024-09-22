@@ -236,4 +236,25 @@ source "drivers/interconnect/Kconfig"
 source "drivers/counter/Kconfig"
 
 source "drivers/most/Kconfig"
+
+source "drivers/vendor/common/Kconfig"
+
+source "drivers/vendor/soc/qcom/Kconfig"
+config ZTE_BOOT_CODE
+        bool "zte boot code"
+        default n
+        help
+          control zte boot code
+		  
+config ZTE_BOARD_NAME
+        string "zte board name"  
+
+config ZTE_CAM_MAGIC_CCI_TIMEOUT
+    bool "zte camera magic cci timeout"
+    default n
+    help
+      control magic cci timeout
+
+source "drivers/nubia/sensors_sensitivity/Kconfig"
+
 endmenu
