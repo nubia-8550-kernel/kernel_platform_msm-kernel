@@ -24,8 +24,14 @@ obj-$(CONFIG_INPUT_MOUSE)	+= mouse/
 obj-$(CONFIG_INPUT_JOYSTICK)	+= joystick/
 obj-$(CONFIG_INPUT_TABLET)	+= tablet/
 obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
+obj-y += fingerprint/goodix/
+obj-y += fingerprint/fpc/
+obj-y += fingerprint/silead/
+obj-y += hall/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 
 obj-$(CONFIG_RMI4_CORE)		+= rmi4/
+obj-$(CONFIG_AW9610X_SAR) += misc/aw9610x_sar/
+obj-$(CONFIG_STMVL53L1) += misc/vl53L1/
