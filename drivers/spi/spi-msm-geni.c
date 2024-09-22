@@ -25,7 +25,7 @@
 #include <linux/suspend.h>
 
 #define SPI_NUM_CHIPSELECT	(4)
-#define SPI_XFER_TIMEOUT_MS	(250)
+#define SPI_XFER_TIMEOUT_MS	(1500)
 #define SPI_AUTO_SUSPEND_DELAY	(250)
 #define SPI_XFER_TIMEOUT_OFFSET	(250)
 #define SPI_SLAVE_SYNC_XFER_TIMEOUT_OFFSET	(50)
@@ -1542,12 +1542,13 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 		return 0;
 
 	 mas->is_xfer_in_progress = true;
-
+	 SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 	/* Client to respect system suspend */
 	if (!pm_runtime_enabled(mas->dev)) {
 		SPI_LOG_ERR(mas->ipc, false, mas->dev,
 			"%s: System suspended\n", __func__);
 		mas->is_xfer_in_progress = false;
+		SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 		return -EACCES;
 	}
 
@@ -1577,6 +1578,7 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 			/* Set device in suspended since resume failed */
 			pm_runtime_set_suspended(mas->dev);
 			mas->is_xfer_in_progress = false;
+			SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 			return ret;
 		}
 
@@ -1586,6 +1588,7 @@ static int spi_geni_prepare_transfer_hardware(struct spi_master *spi)
 				SPI_LOG_ERR(mas->ipc, true, mas->dev,
 				"%s mas_setup failed: %d\n", __func__, ret);
 				mas->is_xfer_in_progress = false;
+				SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 				return ret;
 			}
 		}
@@ -1607,8 +1610,10 @@ static int spi_geni_unprepare_transfer_hardware(struct spi_master *spi)
 	struct spi_geni_master *mas = spi_master_get_devdata(spi);
 	int count = 0;
 
+	SPI_LOG_DBG(mas->ipc, false, mas->dev, "%s: line %d\n", __func__, __LINE__);
 	if (mas->shared_ee || mas->is_le_vm) {
 		mas->is_xfer_in_progress = false;
+		SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 		return 0;
 	}
 
@@ -1639,6 +1644,7 @@ static int spi_geni_unprepare_transfer_hardware(struct spi_master *spi)
 	}
 
 	mas->is_xfer_in_progress = false;
+	SPI_LOG_ERR(mas->ipc, false, mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,mas->is_xfer_in_progress);
 	return 0;
 }
 
@@ -2558,7 +2564,7 @@ static int spi_geni_probe(struct platform_device *pdev)
 			&dev_attr_spi_slave_state.attr);
 
 	geni_mas->is_xfer_in_progress = false;
-
+	SPI_LOG_ERR(geni_mas->ipc, false, geni_mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__, geni_mas->is_xfer_in_progress);
 	dev_info(&pdev->dev, "%s: completed %d\n", __func__, ret);
 	snprintf(boot_marker, sizeof(boot_marker),
 			"M - DRIVER GENI_SPI_%d Ready", spi->bus_num);
@@ -2682,6 +2688,7 @@ static int spi_geni_runtime_suspend(struct device *dev)
 		if (ret)
 			SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
 			"%s failing at geni_icc_disable ret=%d\n", __func__, ret);
+		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev, "%s: line %d\n", __func__, __LINE__);
 		return ret;
 	}
 
@@ -2691,7 +2698,7 @@ exit_rt_suspend:
 	if (ret)
 		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev,
 		"%s failing at geni_icc_disable ret=%d\n", __func__, ret);
-
+	SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev, "%s: line %d\n", __func__, __LINE__);
 	return ret;
 }
 
@@ -2765,7 +2772,7 @@ static int spi_geni_runtime_resume(struct device *dev)
 			"%s: Error %d turning on clocks\n", __func__, ret);
 			return ret;
 		}
-
+		SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev, "%s: line %d\n", __func__, __LINE__);
 		return spi_geni_gpi_suspend_resume(geni_mas, false);
 	}
 
@@ -2795,6 +2802,7 @@ exit_rt_resume:
 		ret = spi_geni_gpi_suspend_resume(geni_mas, false);
 
 	enable_irq(geni_mas->irq);
+	SPI_LOG_DBG(geni_mas->ipc, false, geni_mas->dev, "%s: line %d\n", __func__, __LINE__);
 	return ret;
 }
 
@@ -2808,7 +2816,7 @@ static int spi_geni_suspend(struct device *dev)
 	int ret = 0;
 	struct spi_master *spi = get_spi_master(dev);
 	struct spi_geni_master *geni_mas = spi_master_get_devdata(spi);
-
+	SPI_LOG_ERR(geni_mas->ipc, false, geni_mas->dev,"%s, line %d: is_xfer_in_progress = %d\n", __func__,__LINE__,geni_mas->is_xfer_in_progress);
 	if (geni_mas->is_xfer_in_progress) {
 		if (!pm_runtime_status_suspended(dev)) {
 			SPI_LOG_ERR(geni_mas->ipc, true, geni_mas->dev,
@@ -2900,15 +2908,17 @@ static int spi_geni_hib_suspend(struct device *dev)
 		if (list_empty(&spi->queue) && !spi->cur_msg) {
 			SPI_LOG_ERR(geni_mas->ipc, true, geni_mas->dev,
 					"%s: Force suspend", __func__);
+			/*ZTE:slove auto_restart by spi timeout0*/
+			pm_runtime_disable(dev);
 			ret = spi_geni_runtime_suspend(dev);
 			if (ret) {
 				SPI_LOG_ERR(geni_mas->ipc, true, geni_mas->dev,
 					"Force suspend Failed:%d", ret);
 			} else {
-				pm_runtime_disable(dev);
 				pm_runtime_set_suspended(dev);
-				pm_runtime_enable(dev);
 			}
+			/*ZTE:slove auto_restart by spi timeout0*/
+			pm_runtime_enable(dev);
 		} else {
 			ret = -EBUSY;
 		}
