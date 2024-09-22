@@ -187,3 +187,9 @@ obj-$(CONFIG_GNSS)		+= gnss/
 obj-$(CONFIG_INTERCONNECT)	+= interconnect/
 obj-$(CONFIG_COUNTER)		+= counter/
 obj-$(CONFIG_MOST)		+= most/
+
+obj-$(CONFIG_VENDOR_COMMON_COMPILE)	+= vendor/common/
+obj-$(CONFIG_VENDOR_SOC_QCOM_SRC)	+= vendor/soc/qcom/
+
+obj-$(CONFIG_NUBIA_SENSORS_SENS_EN)	+= nubia/sensors_sensitivity/
+
