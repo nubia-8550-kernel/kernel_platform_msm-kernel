@@ -21,7 +21,7 @@ static int one_hundred = 100;
 static int one_thousand = 1000;
 static int one_thousand_twenty_four = 1024;
 static int two_thousand = 2000;
-
+static int sixteen_million = 16000000;
 /*
  * CFS task prio range is [100 ... 139]
  * 120 is the default prio.
@@ -1040,6 +1040,36 @@ struct ctl_table walt_base_table[] = {
 		.procname	= "walt",
 		.mode		= 0555,
 		.child		= walt_table,
+	},
+	{ },
+};
+
+struct ctl_table nbia_table[] = {
+	{
+		.procname	= "sched_nbia_dp",
+		.data		= &sysctl_sched_nbia_dp,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0664,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= SYSCTL_ONE,
+	},
+	{
+		.procname	= "sched_nbia_dp_array",
+		.data		= &sysctl_sched_nbia_dp_array,
+		.maxlen		= sizeof(unsigned int) * NBIA_DP_ARRAY_LEN,
+		.mode		= 0664,
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= SYSCTL_ZERO,
+		.extra2		= &sixteen_million,
+	},
+	{ }
+};
+struct ctl_table nbia_base_table[] = {
+	{
+		.procname	= "nbia",
+		.mode		= 0666,
+		.child		= nbia_table,
 	},
 	{ },
 };

@@ -1921,13 +1921,18 @@ static inline u16 predict_and_update_buckets(
 			struct task_struct *p, u16 runtime_scaled) {
 	int bidx;
 	u32 pred_demand_scaled;
+	//nubia add begin
+	u32 nbia_demand_scaled;
 	struct walt_task_struct *wts = (struct walt_task_struct *) p->android_vendor_data1;
 
 	bidx = busy_to_bucket(runtime_scaled);
 	pred_demand_scaled = get_pred_busy(p, bidx, runtime_scaled, wts->bucket_bitmask);
 	bucket_increase(wts->busy_buckets, &wts->bucket_bitmask, bidx);
-
-	return pred_demand_scaled;
+	//return pred_demand_scaled;
+        nbia_demand_scaled = nbia_task_demand_boost(p, pred_demand_scaled);
+        trace_sched_nbia_task_demand_boost(p, pred_demand_scaled, nbia_demand_scaled);
+	return max(pred_demand_scaled, nbia_demand_scaled);
+	//nubia add end
 }
 
 static int
@@ -2333,6 +2338,9 @@ static inline void __sched_fork_init(struct task_struct *p)
 	wts->iowaited		= false;
 	wts->load_boost		= 0;
 	wts->boosted_task_load	= 0;
+	//nubia add begin
+        nbia_fork_init(p);
+	//nubia add end
 }
 
 static void init_new_task_load(struct task_struct *p)
@@ -4074,6 +4082,9 @@ static void android_rvh_wake_up_new_task(void *unused, struct task_struct *new)
 		return;
 	init_new_task_load(new);
 	add_new_task_to_grp(new);
+	//nubia add begin
+        nbia_wakeup_new_task(unused, new);
+	//nubia add end
 }
 
 static void walt_cpu_frequency_limits(void *unused, struct cpufreq_policy *policy)
@@ -4352,6 +4363,9 @@ static void android_rvh_try_to_wake_up(void *unused, struct task_struct *p)
 	if (update_preferred_cluster(grp, p, old_load, false))
 		set_preferred_cluster(grp);
 	rcu_read_unlock();
+        //nubia add begin
+        nbia_android_rvh_wakeup_success(current, p);
+        //nubia add end 
 }
 
 static u64 tick_sched_clock;
@@ -4409,6 +4423,7 @@ static void android_rvh_schedule(void *unused, struct task_struct *prev,
 	if (unlikely(walt_disabled))
 		return;
 
+	trace_sched_nbia_task_sched_switch(prev, next);
 	wallclock = walt_rq_clock(rq);
 
 	if (likely(prev != next)) {
@@ -4429,6 +4444,9 @@ static void android_rvh_update_cpus_allowed(void *unused, struct task_struct *p,
 
 	if (unlikely(walt_disabled))
 		return;
+	//nubia add begin
+        if(!nbia_update_cpus_allowed(unused, p, cpus_requested, new_mask, ret))return;
+	//nubia add end
 	if (cpumask_subset(&wts->cpus_requested, cpus_requested))
 		*ret = set_cpus_allowed_ptr(p, &wts->cpus_requested);
 }
@@ -4669,6 +4687,9 @@ static void walt_init(struct work_struct *work)
 	walt_rt_init();
 	walt_cfs_init();
 	walt_halt_init();
+	//nubia add begin
+        nbia_init();
+	//nubia add end
 	wait_for_completion_interruptible(&tick_sched_clock_completion);
 
 	if (!rcu_dereference(rd->pd)) {

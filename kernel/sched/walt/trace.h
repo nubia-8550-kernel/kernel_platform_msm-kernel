@@ -66,6 +66,59 @@ TRACE_EVENT(sched_update_pred_demand,
 		__entry->bucket[11], __entry->bucket[12], __entry->bucket[13],
 		__entry->bucket[14], __entry->bucket[15])
 );
+TRACE_EVENT(sched_nbia_task_demand_boost,
+
+	TP_PROTO(struct task_struct *p, u32 pred_demand, u32 nbia_demand),
+
+	TP_ARGS(p, pred_demand, nbia_demand),
+
+	TP_STRUCT__entry(
+		__array(char,			comm, TASK_COMM_LEN)
+		__field(pid_t,			pid)
+		__field(unsigned int,		pred_demand)
+		__field(unsigned int,		nbia_demand)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->comm, p->comm, TASK_COMM_LEN);
+		__entry->pid		= p->pid;
+		__entry->pred_demand = pred_demand;
+		__entry->nbia_demand	= nbia_demand;
+	),
+
+	TP_printk("nbia_task_demand_boost %d (%s): pred_demand %u nbia_demand %d \n",
+		__entry->pid, __entry->comm,
+		__entry->pred_demand, __entry->nbia_demand)
+);
+
+TRACE_EVENT(sched_nbia_task_sched_switch,
+
+	TP_PROTO(struct task_struct *p, struct task_struct *q),
+
+	TP_ARGS(p, q),
+
+	TP_STRUCT__entry(
+		__array(char,			p_comm, TASK_COMM_LEN)
+		__field(pid_t,			p_pid)
+		__field(unsigned long,		p_affinity)
+		__array(char,			q_comm, TASK_COMM_LEN)
+		__field(pid_t,			q_pid)
+		__field(unsigned long,		q_affinity)
+	),
+
+	TP_fast_assign(
+		memcpy(__entry->p_comm, p->comm, TASK_COMM_LEN);
+		__entry->p_pid		= p->pid;
+		__entry->p_affinity = cpumask_bits(p->cpus_ptr)[0];
+		memcpy(__entry->q_comm, q->comm, TASK_COMM_LEN);
+		__entry->q_pid		= q->pid;
+		__entry->q_affinity = cpumask_bits(q->cpus_ptr)[0];
+	),
+
+	TP_printk("nbia_task_sched_switch pre %d (%s) affinity=%lx  next %d (%s) affinity=%lx \n",
+		__entry->p_pid, __entry->p_comm, __entry->p_affinity,
+		__entry->q_pid, __entry->q_comm, __entry->q_affinity)
+);
 
 TRACE_EVENT(sched_update_history,
 
