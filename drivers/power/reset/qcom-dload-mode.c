@@ -320,6 +320,8 @@ static void __iomem *map_prop_mem(const char *propname)
 static int qcom_dload_probe(struct platform_device *pdev)
 {
 	struct qcom_dload *poweroff;
+	/*Add by zte boot team for dload_mode control*/
+	extern bool is_kernel_log_driver_enabled(void);
 	int ret, temp;
 
 	poweroff = devm_kzalloc(&pdev->dev, sizeof(*poweroff), GFP_KERNEL);
@@ -342,6 +344,15 @@ static int qcom_dload_probe(struct platform_device *pdev)
 	}
 
 	poweroff->dload_dest_addr = map_prop_mem("qcom,msm-imem-dload-type");
+
+	/*Add by zte boot team for dload_mode control*/
+	if (!is_kernel_log_driver_enabled()) {
+		pr_info("%s: disable dump and config hard reset\n", __func__);
+		enable_dump = 0;
+	} else {
+		pr_info("%s: enable dump, dump_mode is %d\n", __func__, dump_mode);
+	}
+
 	msm_enable_dump_mode(enable_dump);
 	dump_mode = qcom_scm_get_download_mode(&temp, 0) ? dump_mode : temp;
 	pr_info("%s: Current dump mode: 0x%x\n", __func__, dump_mode);
