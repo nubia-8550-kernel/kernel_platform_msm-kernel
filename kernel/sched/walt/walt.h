@@ -7,12 +7,13 @@
 #ifndef _WALT_H
 #define _WALT_H
 
-#include "../../../kernel/sched/sched.h"
-#include "../../../fs/proc/internal.h"
-#include <linux/sched/walt.h>
-#include <linux/jump_label.h>
+//#include "../../../kernel/sched/sched.h"
+//#include "../../../fs/proc/internal.h"
+//#include <linux/sched/walt.h>
+//#include <linux/jump_label.h>
 
-#include <linux/cgroup.h>
+//#include <linux/cgroup.h>
+#include "nbia_walt.h"
 
 #define MSEC_TO_NSEC (1000 * 1000)
 
@@ -780,6 +781,7 @@ static inline bool task_fits_capacity(struct task_struct *p,
 					int cpu)
 {
 	unsigned int margin;
+	unsigned int margin_tmp;
 	struct walt_rq *src_wrq = (struct walt_rq *) cpu_rq(task_cpu(p))->android_vendor_data1;
 	struct walt_rq *dst_wrq = (struct walt_rq *) cpu_rq(cpu)->android_vendor_data1;
 
@@ -789,18 +791,41 @@ static inline bool task_fits_capacity(struct task_struct *p,
 	if (src_wrq->cluster->id > dst_wrq->cluster->id) {
 		margin = sched_capacity_margin_down[cpu];
 		if (task_in_related_thread_group(p)) {
-			if (is_min_cluster_cpu(cpu))
-				margin = max(margin, sysctl_sched_early_down[0]);
-			else if (!is_max_cluster_cpu(cpu))
-				margin = max(margin, sysctl_sched_early_down[1]);
+			if (is_min_cluster_cpu(cpu)) {
+				margin_tmp = get_early_down_migrate(0);
+				if(!margin_tmp) {
+					margin = max(margin, sysctl_sched_early_down[0]);
+				} else {
+					margin = max(margin, margin_tmp);
+				}
+			} else if (!is_max_cluster_cpu(cpu)) {
+				margin_tmp = get_early_down_migrate(1);
+				if(!margin_tmp)	{
+					margin = max(margin, sysctl_sched_early_down[1]);
+				} else {
+					margin = max(margin, margin_tmp);
+				}
+			}
 		}
 	} else {
 		margin = sched_capacity_margin_up[task_cpu(p)];
 		if (task_in_related_thread_group(p)) {
-			if (is_min_cluster_cpu(task_cpu(p)))
-				margin = max(margin, sysctl_sched_early_up[0]);
-			else if (!is_max_cluster_cpu(task_cpu(p)))
-				margin = max(margin, sysctl_sched_early_up[1]);
+			if (is_min_cluster_cpu(task_cpu(p))) {
+				margin_tmp = get_early_up_migrate(0);
+				if(!margin_tmp) {
+					margin = max(margin, sysctl_sched_early_up[0]);
+				} else {
+					margin = max(margin, margin_tmp);
+				}
+
+			} else if (!is_max_cluster_cpu(task_cpu(p))) {
+				margin_tmp = get_early_up_migrate(1);
+				if(!margin_tmp) {
+					margin = max(margin, sysctl_sched_early_up[1]);
+				} else {
+					margin = max(margin, margin_tmp);
+				}
+			}
 		}
 	}
 

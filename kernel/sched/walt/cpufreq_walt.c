@@ -16,6 +16,9 @@
 #include "walt.h"
 #include "trace.h"
 
+//nubia add for cpu ctrl
+unsigned int nubia_cpufreq_ctrl_value=0;
+//nubia end
 struct waltgov_tunables {
 	struct gov_attr_set	attr_set;
 	unsigned int		up_rate_limit_us;
@@ -31,6 +34,7 @@ struct waltgov_tunables {
 	unsigned int		target_load_shift;
 	bool			pl;
 	int			boost;
+	unsigned int		target_freq_tune;
 };
 
 struct waltgov_policy {
@@ -212,6 +216,7 @@ static inline unsigned long walt_map_util_freq(unsigned long util,
 {
 	unsigned long fmax = wg_policy->policy->cpuinfo.max_freq;
 	unsigned int shift = wg_policy->tunables->target_load_shift;
+	unsigned int freq_tune = wg_policy->tunables->target_freq_tune;
 
 	if (util >= wg_policy->tunables->target_load_thresh &&
 	    cpu_util_rt(cpu_rq(cpu)) < (cap >> 2))
@@ -219,7 +224,7 @@ static inline unsigned long walt_map_util_freq(unsigned long util,
 			(fmax + (fmax >> shift)) * util,
 			(fmax + (fmax >> 2)) * wg_policy->tunables->target_load_thresh
 			)/cap;
-	return (fmax + (fmax >> 2)) * util / cap;
+	return (fmax + (fmax >> freq_tune)) * util / cap;
 }
 
 static inline unsigned int get_adaptive_low_freq(struct waltgov_policy *wg_policy)
@@ -254,6 +259,31 @@ static unsigned int get_next_freq(struct waltgov_policy *wg_policy,
 			wg_driv_cpu->reasons = CPUFREQ_REASON_ADAPTIVE_HIGH;
 		}
 	}
+
+    //nubia add for cpu ctrl
+    switch (nubia_cpufreq_ctrl_value) {
+        case 1:
+            if(freq > 2000000) {
+                freq = (freq *100 * util)/(98*max);
+            }
+            break;
+        case 2:
+            if(freq > 2323200){
+                freq = 2419200;
+            }
+            break;
+        case 3:
+            if(freq > 2000000) {
+                freq = (freq *100 * util)/(98*max);
+            }
+            if(freq > 2323200){
+                freq = 2419200;
+            }
+            break;
+        default:
+            break;
+    }
+    //nubia end
 
 	trace_waltgov_next_freq(policy->cpu, util, max, raw_freq, freq, policy->min, policy->max,
 				wg_policy->cached_raw_freq, wg_policy->need_freq_update,
@@ -292,6 +322,7 @@ static unsigned long waltgov_get_util(struct waltgov_cpu *wg_cpu)
 #define DEFAULT_PRIME_RTG_BOOST_FREQ 0
 #define DEFAULT_TARGET_LOAD_THRESH 1024
 #define DEFAULT_TARGET_LOAD_SHIFT 4
+#define DEFAULT_TARGET_FREQ_TUNE  2
 static inline void max_and_reason(unsigned long *cur_util, unsigned long boost_util,
 		struct waltgov_cpu *wg_cpu, unsigned int reason)
 {
@@ -651,6 +682,19 @@ static ssize_t pl_store(struct gov_attr_set *attr_set, const char *buf,
 	return count;
 }
 
+//nubia add for cpu ctrl
+static ssize_t cpufreq_ctrl_show(struct gov_attr_set *attr_set, char *buf)
+{
+    return scnprintf(buf, PAGE_SIZE, "%d\n", nubia_cpufreq_ctrl_value);
+}
+
+static ssize_t cpufreq_ctrl_store(struct gov_attr_set *attr_set, const char *buf,
+                    size_t count)
+{
+    sscanf(buf, "%d", &nubia_cpufreq_ctrl_value);
+    return count;
+}
+//nubia end
 static ssize_t boost_show(struct gov_attr_set *attr_set, char *buf)
 {
 	struct waltgov_tunables *tunables = to_waltgov_tunables(attr_set);
@@ -798,6 +842,8 @@ store_attr(adaptive_high_freq);
 show_attr(target_load_thresh);
 show_attr(target_load_shift);
 store_attr(target_load_shift);
+show_attr(target_freq_tune);
+store_attr(target_freq_tune);
 
 static ssize_t store_target_load_thresh(struct gov_attr_set *attr_set,
 				const char *buf, size_t count)
@@ -825,11 +871,15 @@ static struct governor_attr hispeed_load = __ATTR_RW(hispeed_load);
 static struct governor_attr hispeed_freq = __ATTR_RW(hispeed_freq);
 static struct governor_attr rtg_boost_freq = __ATTR_RW(rtg_boost_freq);
 static struct governor_attr pl = __ATTR_RW(pl);
+//nubia add for cpu ctrl
+static struct governor_attr cpufreq_ctrl = __ATTR_RW(cpufreq_ctrl);
+//nubia end
 static struct governor_attr boost = __ATTR_RW(boost);
 WALTGOV_ATTR_RW(adaptive_low_freq);
 WALTGOV_ATTR_RW(adaptive_high_freq);
 WALTGOV_ATTR_RW(target_load_thresh);
 WALTGOV_ATTR_RW(target_load_shift);
+WALTGOV_ATTR_RW(target_freq_tune);
 
 static struct attribute *waltgov_attributes[] = {
 	&up_rate_limit_us.attr,
@@ -838,11 +888,15 @@ static struct attribute *waltgov_attributes[] = {
 	&hispeed_freq.attr,
 	&rtg_boost_freq.attr,
 	&pl.attr,
+    //nubia add for cpu ctrl
+    &cpufreq_ctrl.attr,
+    //nubia end
 	&boost.attr,
 	&adaptive_low_freq.attr,
 	&adaptive_high_freq.attr,
 	&target_load_thresh.attr,
 	&target_load_shift.attr,
+	&target_freq_tune.attr,
 	NULL
 };
 
@@ -950,6 +1004,7 @@ static void waltgov_tunables_save(struct cpufreq_policy *policy,
 	cached->adaptive_high_freq_kernel = tunables->adaptive_high_freq_kernel;
 	cached->target_load_thresh = tunables->target_load_thresh;
 	cached->target_load_shift = tunables->target_load_shift;
+	cached->target_freq_tune = tunables->target_freq_tune;
 }
 
 static void waltgov_tunables_restore(struct cpufreq_policy *policy)
@@ -974,6 +1029,7 @@ static void waltgov_tunables_restore(struct cpufreq_policy *policy)
 	tunables->adaptive_high_freq_kernel = cached->adaptive_high_freq_kernel;
 	tunables->target_load_thresh = cached->target_load_thresh;
 	tunables->target_load_shift = cached->target_load_shift;
+	tunables->target_freq_tune = cached->target_freq_tune;
 }
 
 static int waltgov_init(struct cpufreq_policy *policy)
@@ -1011,6 +1067,7 @@ static int waltgov_init(struct cpufreq_policy *policy)
 	tunables->hispeed_load = DEFAULT_HISPEED_LOAD;
 	tunables->target_load_thresh = DEFAULT_TARGET_LOAD_THRESH;
 	tunables->target_load_shift = DEFAULT_TARGET_LOAD_SHIFT;
+	tunables->target_freq_tune = DEFAULT_TARGET_FREQ_TUNE;
 
 	if (is_min_cluster_cpu(policy->cpu))
 		tunables->rtg_boost_freq = DEFAULT_SILVER_RTG_BOOST_FREQ;
