@@ -110,3 +110,6 @@ obj-$(CONFIG_LEDS_TRIGGERS)		+= trigger/
 
 # LED Blink
 obj-y					+= blink/
+
+# for breathing light leds
+obj-$(CONFIG_NUBIA_LED_AW22XXX)		+= aw22xxx/
