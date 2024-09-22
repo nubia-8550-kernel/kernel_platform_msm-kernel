@@ -9,6 +9,11 @@ menuconfig POWER_SUPPLY
 
 if POWER_SUPPLY
 
+config ZTE_CHARGER_2S_BATTERY
+	bool "Charger 2S battery"
+	help
+ 	  Say Y here to charger 2S battery.
+
 config POWER_SUPPLY_DEBUG
 	bool "Power supply debug"
 	help

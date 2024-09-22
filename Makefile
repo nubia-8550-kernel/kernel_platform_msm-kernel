@@ -1116,6 +1116,23 @@ include $(addprefix $(srctree)/, $(include-y))
 # Do not add $(call cc-option,...) below this line. When you build the kernel
 # from the clean source tree, the GCC plugins do not exist at this point.
 
+ifeq ($(ZTE_FEATURE_PV_AR),true)
+KCFLAGS += -DZTE_FEATURE_PV_AR=1
+endif
+
+ifeq ($(NFC_BOARD_SERST_DIFF),true)
+$(warning "NFC_BOARD_SERST_DIFF is true,se_rst gpio")
+KCFLAGS += -DNFC_BOARD_SERST_DIFF=1
+endif
+
+ifeq ($(ZTE_CHARGER_2S_BATTERY),true)
+KCFLAGS += -DZTE_CHARGER_2S_BATTERY=1
+endif
+ifeq ($(ZTE_CHARGER_1S2P_BATTERY),true)
+KCFLAGS += -DZTE_CHARGER_1S2P_BATTERY=1
+endif
+
+
 # Add user supplied CPPFLAGS, AFLAGS and CFLAGS as the last assignments
 KBUILD_CPPFLAGS += $(KCPPFLAGS)
 KBUILD_AFLAGS   += $(KAFLAGS)
